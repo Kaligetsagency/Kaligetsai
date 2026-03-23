@@ -47,6 +47,7 @@ app.post('/api/task', async (req, res) => {
   runAgentLoop(objective, prisma).catch(console.error);
 });
 
-app.listen(port, () => {
+// Explicitly cast port to a Number and add the "0.0.0.0" host argument
+app.listen(Number(port), "0.0.0.0", () => {
   console.log(`🚀 Orchestration framework running on port ${port}`);
 });
