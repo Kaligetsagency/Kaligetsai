@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Railway will automatically provide the DATABASE_URL environment variable 
+// when you attach a Postgres database to your project.
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model TaskMemory {
+  id          String   @id @default(uuid())
+  objective   String
+  actionsTaken String  // JSON array of steps executed
+  result      String   // Success or failure output
+  createdAt   DateTime @default(now())
+}
+
+model CustomTool {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String
+  scriptCode  String   // The dynamic Node.js/Bash script the agent wrote
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
