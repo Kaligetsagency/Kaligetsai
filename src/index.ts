@@ -1,6 +1,7 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
+import path from 'path';
 import { runAgentLoop } from './agent/orchestrator';
 
 dotenv.config();
@@ -11,12 +12,28 @@ const port = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Health check endpoint (Railway relies on this to know if the app is alive)
+// Serve static files from the "public" directory
+app.use(express.static(path.join(__dirname, '../public')));
+
+// Health check
 app.get('/healthz', (req, res) => {
   res.status(200).json({ status: 'ok', framework: 'online' });
 });
 
-// The main endpoint where you give the agent a task
+// Endpoint to fetch task history for the UI
+app.get('/api/tasks', async (req, res) => {
+  try {
+    const tasks = await prisma.taskMemory.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+    res.json(tasks);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch tasks' });
+  }
+});
+
+// Endpoint to submit a new task
 app.post('/api/task', async (req, res) => {
   const { objective } = req.body;
   
@@ -24,7 +41,6 @@ app.post('/api/task', async (req, res) => {
     return res.status(400).json({ error: 'Objective is required.' });
   }
 
-  // Acknowledge the request immediately so the web UI doesn't hang
   res.status(202).json({ message: 'Task received. Agent loop started.', objective });
 
   // Start the background execution loop
