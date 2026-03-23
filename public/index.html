@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autonomous Agent Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-8">
+
+    <div class="max-w-4xl mx-auto space-y-8">
+        
+        <header class="border-b border-gray-700 pb-4">
+            <h1 class="text-3xl font-bold text-blue-400">Agent Command Center</h1>
+            <p class="text-gray-400 mt-2">Give your self-improving agent an objective.</p>
+        </header>
+
+        <section class="bg-gray-800 rounded-lg p-6 shadow-lg">
+            <h2 class="text-xl font-semibold mb-4">New Objective</h2>
+            <div class="flex gap-4">
+                <input 
+                    type="text" 
+                    id="objectiveInput" 
+                    placeholder="e.g., Check disk space and create a summary file in /tmp..." 
+                    class="flex-1 bg-gray-700 text-white rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                <button 
+                    onclick="submitTask()" 
+                    id="submitBtn"
+                    class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded transition duration-200"
+                >
+                    Execute
+                </button>
+            </div>
+            <p id="statusMessage" class="mt-3 text-sm hidden"></p>
+        </section>
+
+        <section class="bg-gray-800 rounded-lg p-6 shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">Agent Memory (Recent Tasks)</h2>
+                <button onclick="fetchTasks()" class="text-sm text-blue-400 hover:text-blue-300">↻ Refresh</button>
+            </div>
+            
+            <div id="taskList" class="space-y-4">
+                <p class="text-gray-500 italic">Loading memory...</p>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        // Fetch and display past tasks on load
+        async function fetchTasks() {
+            const taskList = document.getElementById('taskList');
+            try {
+                const response = await fetch('/api/tasks');
+                const tasks = await response.json();
+                
+                if (tasks.length === 0) {
+                    taskList.innerHTML = '<p class="text-gray-500 italic">No tasks in memory yet.</p>';
+                    return;
+                }
+
+                taskList.innerHTML = tasks.map(task => `
+                    <div class="border border-gray-700 rounded p-4 bg-gray-750">
+                        <div class="flex justify-between">
+                            <h3 class="font-bold text-lg">${task.objective}</h3>
+                            <span class="text-xs px-2 py-1 rounded ${task.result.includes('Success') ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">
+                                ${task.result}
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1">ID: ${task.id} | Date: ${new Date(task.createdAt).toLocaleString()}</p>
+                        <div class="mt-3 bg-gray-900 p-3 rounded overflow-x-auto text-sm text-gray-300 font-mono">
+                            ${formatActions(task.actionsTaken)}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                taskList.innerHTML = '<p class="text-red-400">Failed to load memory.</p>';
+            }
+        }
+
+        // Helper to format the JSON actions nicely
+        function formatActions(actionsStr) {
+            try {
+                const actions = JSON.parse(actionsStr);
+                return actions.map(a => `<span class="text-blue-400">Action:</span> ${a.action} <br><span class="text-purple-400">Payload:</span> ${a.payload}`).join('<br><br>');
+            } catch (e) {
+                return actionsStr; // Fallback if it's not valid JSON
+            }
+        }
+
+        // Submit a new task to the backend
+        async function submitTask() {
+            const input = document.getElementById('objectiveInput');
+            const btn = document.getElementById('submitBtn');
+            const status = document.getElementById('statusMessage');
+            const objective = input.value.trim();
+
+            if (!objective) return;
+
+            // UI Loading state
+            btn.disabled = true;
+            btn.innerText = 'Initializing...';
+            status.className = 'mt-3 text-sm text-yellow-400 block';
+            status.innerText = 'Task sent to orchestrator. Check backend logs for live execution.';
+
+            try {
+                const response = await fetch('/api/task', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ objective })
+                });
+
+                if (response.ok) {
+                    input.value = '';
+                    status.className = 'mt-3 text-sm text-green-400 block';
+                    status.innerText = 'Task accepted! The agent is now running in the background.';
+                    // Refresh the list after a few seconds to see the result
+                    setTimeout(fetchTasks, 5000); 
+                }
+            } catch (error) {
+                status.className = 'mt-3 text-sm text-red-400 block';
+                status.innerText = 'Failed to communicate with server.';
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Execute';
+            }
+        }
+
+        // Initial load
+        fetchTasks();
+    </script>
+</body>
+</html>
